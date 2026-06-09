@@ -3,11 +3,11 @@
 |family                  |response            | fbrglm vs raw glmnet| fbrglm (ms)| raw glmnet (ms)|formula APIs that succeeded                  |note                                              |
 |:-----------------------|:-------------------|--------------------:|-----------:|---------------:|:--------------------------------------------|:-------------------------------------------------|
 |Gaussian                |continuous          |                    0|         6.0|             3.0|fbrglm + glmnetUtils + parsnip               |                                                  |
-|Binomial                |binary (0/1)        |                    0|         5.0|             3.0|fbrglm + glmnetUtils + parsnip               |                                                  |
+|Binomial                |binary (0/1)        |                    0|         6.0|             3.0|fbrglm + glmnetUtils + parsnip               |                                                  |
 |Poisson                 |count               |                    0|         5.0|             3.0|fbrglm + glmnetUtils (parsnip not attempted) |                                                  |
-|Gamma                   |positive continuous |                    0|        22.0|            11.0|fbrglm + glmnetUtils (parsnip not attempted) |Gamma(link = 'log') family object                 |
-|Negative binomial       |overdispersed count |                    0|        10.0|             9.0|fbrglm + glmnetUtils (parsnip not attempted) |fixed theta; MASS::negative.binomial(theta = ...) |
+|Gamma                   |positive continuous |                    0|        20.0|            10.0|fbrglm + glmnetUtils (parsnip not attempted) |Gamma(link = 'log') family object                 |
+|Negative binomial       |overdispersed count |                    0|        11.0|             9.0|fbrglm + glmnetUtils (parsnip not attempted) |fixed theta; MASS::negative.binomial(theta = ...) |
 |Cox                     |Surv(time, status)  |                    0|         7.0|             3.0|fbrglm + glmnetUtils (parsnip not attempted) |native glmnet Cox; relative-risk scale            |
-|Multinomial             |multiclass factor   |                    0|        17.0|             7.0|fbrglm + glmnetUtils + parsnip               |(n x k) matrix output                             |
-|Multi-response Gaussian |numeric matrix      |                    0|         9.0|             5.0|fbrglm + glmnetUtils (parsnip not attempted) |(n x q) matrix output                             |
+|Multinomial             |multiclass factor   |                    0|        18.0|             7.0|fbrglm + glmnetUtils + parsnip               |(n x k) matrix output                             |
+|Multi-response Gaussian |numeric matrix      |                    0|         8.0|             5.0|fbrglm + glmnetUtils (parsnip not attempted) |(n x q) matrix output                             |
 

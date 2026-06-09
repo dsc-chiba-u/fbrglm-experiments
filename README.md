@@ -31,6 +31,55 @@ conda activate fbrglm-dev
 and falls back again to base `install.packages(repos = NULL, type = "source")`
 when the others can't satisfy a binary dependency.
 
+**Run all scripts from the repository root.** Paths inside the
+benchmark / plot / table scripts are resolved with the following
+priority:
+
+1. The environment variable `FBRGLM_EXP_ROOT`, if set.
+2. The current working directory, if it contains `environment.yml`
+   and an `R/` subdirectory.
+3. The original development path `/home/koki/dev/fbrglm-experiments`
+   as a fallback.
+
+A reviewer who checks the repository out elsewhere can therefore run
+the pipeline by either changing into the checkout (option 2) or by
+exporting `FBRGLM_EXP_ROOT` (option 1).
+
+## Replication for the JSS manuscript
+
+A reviewer reproducing the manuscript's tables and figures from a
+fresh checkout should run, in order, from the repository root:
+
+```sh
+conda env create -f environment.yml          # first time only
+conda activate fbrglm-dev
+
+Rscript scripts/run_all_smoke.R              # sanity checks (00–05)
+Rscript scripts/run_all_benchmarks_small.R   # 10, 11, 12
+Rscript scripts/20_plot_small_benchmarks.R   # PNGs under results/figures/
+Rscript scripts/30_make_manuscript_tables.R  # CSV / MD tables under results/summary/
+```
+
+This yields:
+
+- `results/summary/families_small.csv` and
+  `results/raw/families_small_raw.csv` — per (family, method) parity.
+- `results/summary/prediction_failures_small.csv` and
+  `results/summary/runtime_small.csv` — small-benchmark summaries.
+- `results/raw/runtime_small_raw.csv` — per-iteration timings.
+- `results/summary/manuscript_prediction_table.{csv,md}`,
+  `results/summary/manuscript_runtime_table.{csv,md}`,
+  `results/summary/manuscript_family_table.{csv,md}` — the three
+  paste-ready summaries referenced in the manuscript.
+- `results/figures/prediction_failures_small.png` and
+  `results/figures/runtime_small.png` — the two figures embedded in
+  the manuscript draft.
+
+All numbers are produced by a **small, fixed-λ sanity-check
+benchmark**. They are intentionally not a general performance claim;
+the runtime figures in particular should be read as illustrative
+rather than as a comparative ranking.
+
 ## Smoke tests
 
 `scripts/run_all_smoke.R` sources, in order:

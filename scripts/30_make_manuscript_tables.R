@@ -17,7 +17,12 @@ suppressPackageStartupMessages({
     library(knitr)
 })
 
-here_root <- "/home/koki/dev/fbrglm-experiments"
+here_root <- (function() {
+    e <- Sys.getenv("FBRGLM_EXP_ROOT")
+    if (nzchar(e))                                          return(e)
+    if (file.exists("environment.yml") && dir.exists("R")) return(getwd())
+    "/home/koki/dev/fbrglm-experiments"
+})()
 source(file.path(here_root, "R", "benchmark_helpers.R"), local = TRUE)
 
 csv_pred <- file.path(here_root, "results", "summary",
