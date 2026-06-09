@@ -178,7 +178,7 @@ results$glmnetUtils <- row(
     pred_len  = if (gu_pred$success) length(gu_pred$value) else NA_integer_,
     train_ncol = gu_train_ncol,
     test_ncol  = if (gu_pred$success) gu_train_ncol else NA_integer_,
-    note = "auto: glmnetUtils tracks formula/xlevels internally"
+    note = "observed: formula interface, but failed under narrowed test factor levels"
 )
 
 ## --- assemble & save -------------------------------------------------
