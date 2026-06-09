@@ -174,13 +174,14 @@ scripts/
   05_lambda_cv_equivalence.R
   10_benchmark_prediction_failures.R
   11_benchmark_runtime_small.R
+  12_benchmark_families_small.R
   20_plot_small_benchmarks.R
   30_make_manuscript_tables.R
   run_all_smoke.R
   run_all_benchmarks_small.R
 results/
-  summary/                  # CSVs (tracked in git)
-  figures/                  # PNGs   (tracked in git)
-  raw/                      # raw per-run artifacts (currently empty)
+  summary/                  # canonical summary CSVs and MD tables
+  figures/                  # generated PNGs
+  raw/                      # per-iteration / per-row raw benchmark artifacts
 environment.yml             # conda env spec for fbrglm-dev
 ```
