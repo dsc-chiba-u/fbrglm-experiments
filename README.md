@@ -126,6 +126,26 @@ will follow.
 Numbers are illustrative — the dataset is intentionally tiny, and a
 larger benchmark suite will follow.
 
+## Manuscript-ready summaries
+
+`scripts/30_make_manuscript_tables.R` turns the small-benchmark CSVs
+into compact summary tables aimed at paper drafts and the README:
+
+- `results/summary/manuscript_prediction_table.csv` /
+  `results/summary/manuscript_prediction_table.md` — one row per method
+  with success / user-burden / one-line interpretation
+- `results/summary/manuscript_runtime_table.csv` /
+  `results/summary/manuscript_runtime_table.md` — one row per
+  `(scenario, method)` with median runtime in ms, ratio to raw `glmnet`,
+  and a one-word interpretation
+
+The Markdown variants are pipe tables that paste into GitHub READMEs
+and Pandoc-flavoured Markdown directly.
+
+```sh
+Rscript scripts/30_make_manuscript_tables.R
+```
+
 ## Layout
 
 ```
@@ -142,6 +162,7 @@ scripts/
   10_benchmark_prediction_failures.R
   11_benchmark_runtime_small.R
   20_plot_small_benchmarks.R
+  30_make_manuscript_tables.R
   run_all_smoke.R
   run_all_benchmarks_small.R
 results/

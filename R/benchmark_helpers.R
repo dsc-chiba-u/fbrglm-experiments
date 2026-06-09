@@ -1,5 +1,8 @@
 ## Small helpers for the benchmark scripts.
 
+#' Coalesce: return `a` unless it is NULL, in which case return `b`.
+`%||%` <- function(a, b) if (is.null(a)) b else a
+
 #' Safely run an expression and capture success / error / elapsed time.
 #'
 #' @param expr a quoted expression or thunk-style expression. The function
