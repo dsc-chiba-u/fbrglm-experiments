@@ -1,4 +1,4 @@
 "method","runtime_sec","success","error"
-"fbrglm",0.00489945197477937,TRUE,NA
-"glmnet_raw",0.00253229995723814,TRUE,NA
-"glmnetUtils",0.0039177070138976,TRUE,NA
+"fbrglm",0.00488945108372718,TRUE,NA
+"glmnet_raw",0.00261770898941904,TRUE,NA
+"glmnetUtils",0.00395830196794122,TRUE,NA
