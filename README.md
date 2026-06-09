@@ -151,6 +151,10 @@ into compact summary tables aimed at paper drafts and the README:
   `results/summary/manuscript_runtime_table.md` — one row per
   `(scenario, method)` with median runtime in ms, ratio to raw `glmnet`,
   and a one-word interpretation
+- `results/summary/manuscript_family_table.csv` /
+  `results/summary/manuscript_family_table.md` — family-wide parity
+  summary for paper drafts: one row per glmnet-compatible family with
+  fbrglm vs raw `glmnet` diff, fit + predict runtime, and a short note
 
 The Markdown variants are pipe tables that paste into GitHub READMEs
 and Pandoc-flavoured Markdown directly.

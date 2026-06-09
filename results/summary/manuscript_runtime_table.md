@@ -2,20 +2,20 @@
 
 |scenario      |method           | median (ms)| relative to raw glmnet|interpretation                |
 |:-------------|:----------------|-----------:|----------------------:|:-----------------------------|
-|n200_p5       |fbrglm           |        4.78|                 1.88×|lightweight formula interface |
-|n200_p5       |glmnet_raw       |        2.55|                 1.00×|fastest matrix API            |
-|n200_p5       |glmnetUtils      |        4.03|                 1.58×|formula interface             |
-|n200_p5       |parsnip_workflow |       15.82|                 6.21×|full workflow framework       |
-|n1000_p20     |fbrglm           |        8.19|                 2.66×|lightweight formula interface |
-|n1000_p20     |glmnet_raw       |        3.08|                 1.00×|fastest matrix API            |
-|n1000_p20     |glmnetUtils      |        6.85|                 2.23×|formula interface             |
-|n1000_p20     |parsnip_workflow |       23.15|                 7.52×|full workflow framework       |
-|n1000_p20_f10 |fbrglm           |        7.37|                 2.33×|lightweight formula interface |
-|n1000_p20_f10 |glmnet_raw       |        3.16|                 1.00×|fastest matrix API            |
-|n1000_p20_f10 |glmnetUtils      |        7.93|                 2.51×|formula interface             |
-|n1000_p20_f10 |parsnip_workflow |       26.88|                 8.51×|full workflow framework       |
-|n2000_p50_f20 |fbrglm           |       14.60|                 3.15×|lightweight formula interface |
-|n2000_p50_f20 |glmnet_raw       |        4.64|                 1.00×|fastest matrix API            |
-|n2000_p50_f20 |glmnetUtils      |       18.67|                 4.03×|formula interface             |
-|n2000_p50_f20 |parsnip_workflow |       55.41|                11.95×|full workflow framework       |
+|n200_p5       |fbrglm           |        4.99|                 1.93×|lightweight formula interface |
+|n200_p5       |glmnet_raw       |        2.59|                 1.00×|fastest matrix API            |
+|n200_p5       |glmnetUtils      |        4.09|                 1.58×|formula interface             |
+|n200_p5       |parsnip_workflow |       15.66|                 6.06×|full workflow framework       |
+|n1000_p20     |fbrglm           |        7.62|                 2.55×|lightweight formula interface |
+|n1000_p20     |glmnet_raw       |        2.99|                 1.00×|fastest matrix API            |
+|n1000_p20     |glmnetUtils      |        6.81|                 2.28×|formula interface             |
+|n1000_p20     |parsnip_workflow |       22.62|                 7.56×|full workflow framework       |
+|n1000_p20_f10 |fbrglm           |        6.99|                 2.17×|lightweight formula interface |
+|n1000_p20_f10 |glmnet_raw       |        3.22|                 1.00×|fastest matrix API            |
+|n1000_p20_f10 |glmnetUtils      |        8.07|                 2.51×|formula interface             |
+|n1000_p20_f10 |parsnip_workflow |       26.86|                 8.34×|full workflow framework       |
+|n2000_p50_f20 |fbrglm           |       14.62|                 3.07×|lightweight formula interface |
+|n2000_p50_f20 |glmnet_raw       |        4.77|                 1.00×|fastest matrix API            |
+|n2000_p50_f20 |glmnetUtils      |       18.99|                 3.98×|formula interface             |
+|n2000_p50_f20 |parsnip_workflow |       54.81|                11.50×|full workflow framework       |
 
