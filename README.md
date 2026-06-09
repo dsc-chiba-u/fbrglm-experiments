@@ -97,22 +97,29 @@ moves the bookkeeping to the caller. `glmnet_raw_naive` and
 
 ### Runtime benchmark
 
-Small binomial dataset (n = 200, p = 5, single λ = 0.05), median of 5
-iterations from `bench::mark()`.
+Binomial fit + predict at a fixed λ = 0.05, across four scenarios.
+Median of 5 iterations from `bench::mark()`, all units in milliseconds.
 
-| method             | median runtime |
-|--------------------|----------------|
-| `fbrglm`           | ~ 4.9 ms       |
-| `glmnet_raw`       | ~ 2.7 ms       |
-| `glmnetUtils`      | ~ 4.1 ms       |
-| `parsnip_workflow` | ~ 15.6 ms      |
+| scenario        | n    | p_num | n_factor × n_levels | fbrglm | glmnet_raw | glmnetUtils | parsnip_workflow |
+|-----------------|-----:|------:|--------------------:|-------:|-----------:|------------:|-----------------:|
+| `n200_p5`       |  200 |     5 |                  — |    4.9 |        2.7 |         4.0 |             15.8 |
+| `n1000_p20`     | 1000 |    20 |                  — |    7.2 |        3.0 |         6.6 |             22.2 |
+| `n1000_p20_f10` | 1000 |    20 |          1 × 10    |    7.5 |        3.2 |         7.8 |             26.6 |
+| `n2000_p50_f20` | 2000 |    50 |          1 × 20    |   14.4 |        4.8 |        15.9 |             55.4 |
 
-fbrglm pays a small constant cost over raw `glmnet` for its formula /
-factor / xlevels bookkeeping and lands in the same neighbourhood as
-`glmnetUtils`. The tidymodels workflow path is the slowest of the four
-— ~3× fbrglm — because every fit goes through the hardhat /
-workflows abstraction layer. The overhead is what buys you the
-prediction-path robustness above.
+Pattern in this small grid:
+
+- raw `glmnet` is the fastest because it does no formula / factor
+  bookkeeping at all.
+- `fbrglm` sits roughly 2–3× the raw `glmnet` cost and is broadly
+  comparable to `glmnetUtils` across these scenarios (slightly faster
+  on the larger factor case).
+- The `parsnip` / `workflows` path is consistently the heaviest in this
+  tested setting (≈ 3–4× fbrglm), since each call rebuilds the
+  hardhat / workflows preprocessing stack.
+
+These numbers are intentionally tiny — a larger, more rigorous suite
+will follow.
 
 ![runtime figure](results/figures/runtime_small.png)
 

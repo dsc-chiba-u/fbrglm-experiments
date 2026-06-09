@@ -75,29 +75,34 @@ message("[20] wrote ", fail_png)
 
 ## --- runtime plot ----------------------------------------------------
 rt_df <- utils::read.csv(csv_runtime, stringsAsFactors = FALSE)
-rt_df$method <- factor(rt_df$method, levels = rt_df$method)
-rt_df$success <- as.logical(rt_df$success)
+rt_df$success    <- as.logical(rt_df$success)
 rt_df$runtime_ms <- rt_df$runtime_sec * 1000
 
+## Canonical method order; preserve CSV scenario order.
+method_levels <- c("fbrglm", "glmnet_raw", "glmnetUtils", "parsnip_workflow")
+rt_df$method   <- factor(rt_df$method,
+                         levels = intersect(method_levels, unique(rt_df$method)))
+rt_df$scenario <- factor(rt_df$scenario, levels = unique(rt_df$scenario))
+
 p_rt <- ggplot(rt_df,
-               aes(x = method, y = runtime_ms,
-                   fill = ifelse(success, "ok", "fail"))) +
-    geom_col(width = 0.6) +
-    geom_text(aes(label = sprintf("%.2f ms", runtime_ms)),
-              vjust = -0.4, size = 3.2) +
-    scale_fill_manual(values = c(ok = "#2C7BB6", fail = "#D7191C"),
-                      guide = "none") +
+               aes(x = method, y = runtime_ms, fill = method)) +
+    geom_col(width = 0.7) +
+    geom_text(aes(label = ifelse(is.na(runtime_ms), "fail",
+                                  sprintf("%.1f", runtime_ms))),
+              vjust = -0.3, size = 2.8) +
+    facet_wrap(~ scenario, scales = "free_y") +
+    scale_fill_brewer(palette = "Set2", guide = "none") +
     labs(
-        title    = "fit + predict wall-clock on a small binomial dataset",
-        subtitle = "n = 200, p = 5; median of 5 iterations via bench::mark()",
+        title    = "fit + predict wall-clock across scenarios",
+        subtitle = "binomial, lambda=0.05; median of 5 iterations via bench::mark()",
         x = NULL,
         y = "milliseconds"
     ) +
-    expand_limits(y = max(rt_df$runtime_ms, na.rm = TRUE) * 1.15) +
-    theme_minimal(base_size = 11)
+    theme_minimal(base_size = 11) +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1, size = 8))
 
 rt_png <- file.path(fig_dir, "runtime_small.png")
-ggsave(rt_png, p_rt, width = 7, height = 4, dpi = 300)
+ggsave(rt_png, p_rt, width = 8, height = 5, dpi = 300)
 message("[20] wrote ", rt_png)
 
 message("[20] plot_small_benchmarks: done")

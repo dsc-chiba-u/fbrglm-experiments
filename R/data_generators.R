@@ -62,6 +62,47 @@ make_factor_mismatch_data <- function(n_train = 200,
     list(train = train, test = test)
 }
 
+#' Generate a binomial dataset for runtime benchmarking.
+#'
+#' Numeric predictors `x1..x{p_numeric}` plus optionally `n_factor` factor
+#' columns `g1..g{n_factor}`, each with `n_levels` levels drawn uniformly.
+#' The linear predictor uses `x1` and `x2` only, regardless of `p_numeric`;
+#' the rest are noise. The response column `y` is moved to the front.
+#'
+#' @return data.frame with `y` first, then `x*`, then `g*`.
+make_runtime_binomial_data <- function(n,
+                                       p_numeric,
+                                       n_factor = 0L,
+                                       n_levels = 0L,
+                                       seed = 1) {
+    stopifnot(n >= 20, p_numeric >= 2)
+    old <- .Random.seed_safe(seed)
+    on.exit(.Random.seed_restore(old))
+
+    X_num <- matrix(stats::rnorm(n * p_numeric), n, p_numeric)
+    colnames(X_num) <- paste0("x", seq_len(p_numeric))
+    df <- as.data.frame(X_num)
+
+    if (n_factor > 0L) {
+        stopifnot(n_levels >= 2L)
+        lvl_pool <- if (n_levels <= length(LETTERS)) {
+            LETTERS[seq_len(n_levels)]
+        } else {
+            sprintf("L%02d", seq_len(n_levels))
+        }
+        for (j in seq_len(n_factor)) {
+            df[[paste0("g", j)]] <- factor(
+                sample(lvl_pool, n, replace = TRUE),
+                levels = lvl_pool
+            )
+        }
+    }
+
+    eta <- 0.4 * df$x1 - 0.3 * df$x2
+    df$y <- stats::rbinom(n, 1, stats::plogis(eta))
+    df[, c("y", setdiff(names(df), "y"))]
+}
+
 #' Generate gaussian data with several wide-ish factors.
 #'
 #' @param n integer, rows
