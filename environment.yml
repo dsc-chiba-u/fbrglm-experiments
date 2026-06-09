@@ -1,0 +1,25 @@
+name: fbrglm-dev
+channels:
+  - conda-forge
+dependencies:
+  - r-base>=4.3
+  - r-devtools
+  - r-testthat
+  - r-roxygen2
+  - r-usethis
+  - r-pak
+  - r-glmnet
+  - r-matrix
+  - r-glmnetutils
+  - r-parsnip
+  - r-recipes
+  - r-workflows
+  - r-hardhat
+  - r-broom
+  - r-bench
+  - r-lobstr
+  - r-data.table
+  - r-dplyr
+  - r-ggplot2
+  - r-here
+  - r-sessioninfo
