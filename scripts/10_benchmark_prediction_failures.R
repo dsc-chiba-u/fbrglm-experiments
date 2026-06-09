@@ -12,6 +12,8 @@ suppressPackageStartupMessages({
     library(fbrglm)
     library(glmnet)
     library(glmnetUtils)
+    library(parsnip)
+    library(workflows)
 })
 
 here_root <- "/home/koki/dev/fbrglm-experiments"
@@ -179,6 +181,44 @@ results$glmnetUtils <- row(
     train_ncol = gu_train_ncol,
     test_ncol  = if (gu_pred$success) gu_train_ncol else NA_integer_,
     note = "observed: formula interface, but failed under narrowed test factor levels"
+)
+
+## --- parsnip_workflow ------------------------------------------------
+## Classification mode requires a factor outcome.
+train_p <- train
+train_p$y <- factor(train$y)
+
+parsnip_fit <- safe_run({
+    spec <- parsnip::logistic_reg(penalty = lam, mixture = 1) |>
+        parsnip::set_engine("glmnet") |>
+        parsnip::set_mode("classification")
+    wf <- workflows::workflow() |>
+        workflows::add_formula(y ~ x1 + x2 + g) |>
+        workflows::add_model(spec)
+    fit(wf, data = train_p)
+})
+parsnip_pred <- if (parsnip_fit$success) {
+    safe_run({
+        pr <- predict(parsnip_fit$value, new_data = test, type = "prob")
+        as.numeric(pr[[".pred_1"]])
+    })
+} else {
+    list(success = FALSE, error = "fit failed",
+         elapsed = NA_real_, value = NULL)
+}
+parsnip_success <- parsnip_fit$success && parsnip_pred$success
+parsnip_err <- {
+    if (!parsnip_fit$success) parsnip_fit$error
+    else if (!parsnip_pred$success) parsnip_pred$error
+    else NA_character_
+}
+results$parsnip_workflow <- row(
+    "parsnip_workflow", parsnip_success, parsnip_err,
+    pred_len  = if (parsnip_pred$success) length(parsnip_pred$value)
+                else NA_integer_,
+    train_ncol = NA_integer_,
+    test_ncol  = NA_integer_,
+    note = "observed: tidymodels workflow with glmnet engine under narrowed test factor levels"
 )
 
 ## --- assemble & save -------------------------------------------------

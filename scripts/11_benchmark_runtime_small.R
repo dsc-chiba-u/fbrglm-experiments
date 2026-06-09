@@ -7,6 +7,8 @@ suppressPackageStartupMessages({
     library(fbrglm)
     library(glmnet)
     library(glmnetUtils)
+    library(parsnip)
+    library(workflows)
 })
 
 here_root <- "/home/koki/dev/fbrglm-experiments"
@@ -74,6 +76,21 @@ results$glmnetUtils <- run_one("glmnetUtils", function() {
                                family = "binomial",
                                alpha = 1, lambda = lam)
     as.vector(predict(fit, newdata = df, s = lam, type = "response"))
+})
+
+## --- parsnip_workflow ------------------------------------------------
+df_p <- df
+df_p$y <- factor(df$y)
+
+results$parsnip_workflow <- run_one("parsnip_workflow", function() {
+    spec <- parsnip::logistic_reg(penalty = lam, mixture = 1) |>
+        parsnip::set_engine("glmnet") |>
+        parsnip::set_mode("classification")
+    wf <- workflows::workflow() |>
+        workflows::add_formula(y ~ x1 + x2 + x3 + x4 + x5) |>
+        workflows::add_model(spec)
+    fit_obj <- fit(wf, data = df_p)
+    predict(fit_obj, new_data = df_p, type = "prob")
 })
 
 df_out <- do.call(rbind, results)

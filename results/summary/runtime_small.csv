@@ -1,4 +1,5 @@
 "method","runtime_sec","success","error"
-"fbrglm",0.00464171206112951,TRUE,NA
-"glmnet_raw",0.0025064250221476,TRUE,NA
-"glmnetUtils",0.00390622799750417,TRUE,NA
+"fbrglm",0.00490204617381096,TRUE,NA
+"glmnet_raw",0.00266407104209065,TRUE,NA
+"glmnetUtils",0.00412469392176718,TRUE,NA
+"parsnip_workflow",0.0155660669552162,TRUE,NA

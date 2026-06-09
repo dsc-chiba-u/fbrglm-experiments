@@ -3,3 +3,4 @@
 "glmnet_raw_naive",FALSE,"The number of variables in newx must be 5",NA,5,3,"manual: model.matrix(train) vs model.matrix(test) separately"
 "glmnet_raw_safe",TRUE,NA,50,5,5,"manual: relevel(test$g, levels = levels(train$g)) before model.matrix"
 "glmnetUtils",FALSE,"The number of variables in newx must be 6",NA,6,NA,"observed: formula interface, but failed under narrowed test factor levels"
+"parsnip_workflow",TRUE,NA,50,NA,NA,"observed: tidymodels workflow with glmnet engine under narrowed test factor levels"

@@ -82,32 +82,37 @@ just two observed values). This is the canonical setup where a naive
 | `glmnet_raw_naive`   | ❌      | 5          | 3         | manual: `model.matrix(train)` vs `model.matrix(test)` built separately |
 | `glmnet_raw_safe`    | ✅      | 5          | 5         | manual: `relevel(test$g, levels = levels(train$g))` before `model.matrix` |
 | `glmnetUtils`        | ❌      | 6          | NA        | formula interface, but failed under narrowed test factor levels |
+| `parsnip_workflow`   | ✅      | NA         | NA        | tidymodels workflow with the `glmnet` engine; hardhat/recipes restore xlevels |
 
-Both failure rows produce a `glmnet` runtime error of the form
+Failure rows produce a `glmnet` runtime error of the form
 `The number of variables in newx must be N`.
 
 ![prediction-failure figure](results/figures/prediction_failures_small.png)
 
-The takeaway: fbrglm's `predict()` is the only formula-driven path that
-handles narrowed test factors without the user having to manually
-re-level. `glmnet_raw_safe` works but moves the bookkeeping to the
-caller, which is exactly the friction fbrglm is meant to remove.
+The takeaway: fbrglm's `predict()` and parsnip's workflow path both
+handle narrowed test factors automatically because each stores the
+training-time xlevels on the fit. `glmnet_raw_safe` works as well, but
+moves the bookkeeping to the caller. `glmnet_raw_naive` and
+`glmnetUtils` fail — the friction fbrglm is meant to remove.
 
 ### Runtime benchmark
 
 Small binomial dataset (n = 200, p = 5, single λ = 0.05), median of 5
 iterations from `bench::mark()`.
 
-| method        | median runtime |
-|---------------|----------------|
-| `fbrglm`      | ~ 4.9 ms       |
-| `glmnet_raw`  | ~ 2.5 ms       |
-| `glmnetUtils` | ~ 4.0 ms       |
+| method             | median runtime |
+|--------------------|----------------|
+| `fbrglm`           | ~ 4.9 ms       |
+| `glmnet_raw`       | ~ 2.7 ms       |
+| `glmnetUtils`      | ~ 4.1 ms       |
+| `parsnip_workflow` | ~ 15.6 ms      |
 
 fbrglm pays a small constant cost over raw `glmnet` for its formula /
 factor / xlevels bookkeeping and lands in the same neighbourhood as
-`glmnetUtils`. The overhead is what buys you the prediction-path
-robustness above.
+`glmnetUtils`. The tidymodels workflow path is the slowest of the four
+— ~3× fbrglm — because every fit goes through the hardhat /
+workflows abstraction layer. The overhead is what buys you the
+prediction-path robustness above.
 
 ![runtime figure](results/figures/runtime_small.png)
 
