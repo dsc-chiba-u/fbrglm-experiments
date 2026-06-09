@@ -56,6 +56,17 @@ Rscript scripts/run_all_smoke.R
   to a train/test factor-level mismatch.
 - `scripts/11_benchmark_runtime_small.R` — wall-clock for fit+predict on
   a small binomial dataset.
+- `scripts/12_benchmark_families_small.R` — parity sweep across every
+  glmnet-compatible family. For each `(family, method)` cell, records
+  fit / predict success, runtime, and the maximum absolute difference
+  vs raw `glmnet`. Negative binomial here means **fixed θ** via
+  `MASS::negative.binomial(theta = ...)`; Cox here means **native
+  glmnet Cox** (a `Surv()` LHS with `family = "cox"`), not the
+  piecewise exponential Poisson formulation that the fbrglm vignette
+  walks through. Methods that do not have a same-engine `glmnet`
+  equivalent for a family (e.g. the tidymodels stack has no built-in
+  Gamma + glmnet engine in this setup) are recorded with
+  `supported_attempted = FALSE` and the reason in `note`.
 
 ```sh
 Rscript scripts/run_all_benchmarks_small.R
@@ -66,6 +77,8 @@ Outputs land under:
 
 - `results/summary/prediction_failures_small.csv`
 - `results/summary/runtime_small.csv`
+- `results/summary/families_small.csv` and
+  `results/raw/families_small_raw.csv`
 - `results/figures/prediction_failures_small.png`
 - `results/figures/runtime_small.png`
 
