@@ -20,7 +20,16 @@ here_root <- (function() {
     e <- Sys.getenv("FBRGLM_EXP_ROOT")
     if (nzchar(e))                                          return(e)
     if (file.exists("environment.yml") && dir.exists("R")) return(getwd())
-    "/home/koki/dev/fbrglm-experiments"
+    cur <- normalizePath(getwd(), mustWork = FALSE)
+    for (i in seq_len(8)) {
+        if (file.exists(file.path(cur, "environment.yml")) &&
+            dir.exists(file.path(cur, "R"))) return(cur)
+        parent <- dirname(cur); if (parent == cur) break
+        cur <- parent
+    }
+    stop("Cannot locate the fbrglm-experiments repository root. ",
+         "Run from the repo root, or set FBRGLM_EXP_ROOT.",
+         call. = FALSE)
 })()
 source(file.path(here_root, "R", "data_generators.R"), local = TRUE)
 source(file.path(here_root, "R", "benchmark_helpers.R"), local = TRUE)

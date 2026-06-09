@@ -26,24 +26,39 @@ conda env create -f environment.yml          # first time only
 conda activate fbrglm-dev
 ```
 
-`scripts/00_install_local_fbrglm.R` installs the local fbrglm from
-`/home/koki/dev/fbrglm`. It prefers `pak`, falls back to `devtools`,
-and falls back again to base `install.packages(repos = NULL, type = "source")`
-when the others can't satisfy a binary dependency.
+`scripts/00_install_local_fbrglm.R` installs fbrglm. By default it
+fetches the package from GitHub (`dsc-chiba-u/fbrglm`); set
+`FBRGLM_PKG_ROOT` to a local checkout if you want to test an
+unpublished version against the benchmarks. The installer prefers
+`pak`, then `remotes::install_github()`, then
+`devtools::install_github()`, and finally a base
+`install.packages(repos = NULL, type = "source")` against the local
+checkout when one is provided. On systems where the binary `cli`
+package downloaded by `pak` is incompatible with the system glibc
+(seen on some long-running Linux installs), exporting
+`FBRGLM_PKG_ROOT` and letting the source-install path take over is
+the simplest workaround:
+
+```sh
+export FBRGLM_PKG_ROOT=/path/to/local/fbrglm
+Rscript scripts/00_install_local_fbrglm.R
+```
 
 **Run all scripts from the repository root.** Paths inside the
 benchmark / plot / table scripts are resolved with the following
 priority:
 
-1. The environment variable `FBRGLM_EXP_ROOT`, if set.
+1. The `FBRGLM_EXP_ROOT` environment variable, if set.
 2. The current working directory, if it contains `environment.yml`
    and an `R/` subdirectory.
-3. The original development path `/home/koki/dev/fbrglm-experiments`
-   as a fallback.
+3. A walk up from the current working directory looking for a
+   directory with both `environment.yml` and `R/`.
 
-A reviewer who checks the repository out elsewhere can therefore run
-the pipeline by either changing into the checkout (option 2) or by
-exporting `FBRGLM_EXP_ROOT` (option 1).
+If none of these resolve, the scripts stop with an error rather than
+silently falling back to a developer-specific path. A reviewer who
+checks the repository out anywhere can therefore run the pipeline by
+either changing into the checkout (option 2) or by exporting
+`FBRGLM_EXP_ROOT` (option 1).
 
 ## Replication for the JSS manuscript
 
