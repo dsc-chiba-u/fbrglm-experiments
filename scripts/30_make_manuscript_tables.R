@@ -4,12 +4,15 @@
 ## (paste-friendly).
 ##
 ## Inputs:
-##   results/summary/prediction_failures_small.csv
+##   results/summary/prediction_failures_small.csv        (narrowed test)
+##   results/summary/prediction_failures_novel_small.csv  (novel-level test)
 ##   results/summary/runtime_small.csv
 ##
 ## Outputs:
-##   results/summary/manuscript_prediction_table.csv
-##   results/summary/manuscript_prediction_table.md
+##   results/summary/manuscript_prediction_table.csv          (Table 3a)
+##   results/summary/manuscript_prediction_table.md           (Table 3a)
+##   results/summary/manuscript_prediction_table_novel.csv    (Table 3b)
+##   results/summary/manuscript_prediction_table_novel.md     (Table 3b)
 ##   results/summary/manuscript_runtime_table.csv
 ##   results/summary/manuscript_runtime_table.md
 
@@ -34,10 +37,12 @@ here_root <- (function() {
 })()
 source(file.path(here_root, "R", "benchmark_helpers.R"), local = TRUE)
 
-csv_pred <- file.path(here_root, "results", "summary",
-                      "prediction_failures_small.csv")
-csv_rt   <- file.path(here_root, "results", "summary",
-                      "runtime_small.csv")
+csv_pred       <- file.path(here_root, "results", "summary",
+                            "prediction_failures_small.csv")
+csv_pred_novel <- file.path(here_root, "results", "summary",
+                            "prediction_failures_novel_small.csv")
+csv_rt         <- file.path(here_root, "results", "summary",
+                            "runtime_small.csv")
 
 if (!file.exists(csv_pred) || !file.exists(csv_rt)) {
     message("[30] Required input CSV(s) missing; run first:")
@@ -48,60 +53,99 @@ if (!file.exists(csv_pred) || !file.exists(csv_rt)) {
 out_dir <- file.path(here_root, "results", "summary")
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
-## --- prediction table -----------------------------------------------
-pred_in <- utils::read.csv(csv_pred, stringsAsFactors = FALSE)
-
-## Hand-authored manuscript copy, keyed by method.
-pred_meta <- list(
+## --- prediction tables (Table 3a + Table 3b) -------------------------
+## Two scenarios share the same downstream layout; we just key the
+## meta-text by scenario + method.
+pred_meta_narrowed <- list(
     fbrglm = list(
         user_burden    = "automatic",
-        interpretation = "lightweight glm-like interface"
+        interpretation = "default glm-strict path; auto-aligns the narrowed test"
     ),
     glmnet_raw_naive = list(
         user_burden    = "manual matrix alignment required",
-        interpretation = "naive separately-built model matrices can mismatch"
+        interpretation = "naive separately-built model matrices mismatch in width"
     ),
     glmnet_raw_safe = list(
         user_burden    = "manual matrix alignment required",
-        interpretation = "succeeds when user manually aligns factor levels / design matrix"
+        interpretation = "succeeds when user re-levels test$g to match train"
     ),
     glmnetUtils = list(
         user_burden    = "automatic",
-        interpretation = "automatic formula interface, failed under narrowed test factor levels"
+        interpretation = "default fast path: no xlevels carried; fails like raw glmnet"
+    ),
+    glmnetUtils_mf = list(
+        user_burden    = "user must set use.model.frame = TRUE",
+        interpretation = "model.frame path carries xlevels; succeeds (matches glm())"
     ),
     parsnip_workflow = list(
         user_burden    = "workflow framework",
-        interpretation = "robust via workflow / hardhat preprocessing"
+        interpretation = "hardhat preprocessor carries xlevels"
     )
 )
 
-pred_rows <- vector("list", nrow(pred_in))
-for (i in seq_len(nrow(pred_in))) {
-    m <- pred_in$method[i]
-    meta <- pred_meta[[m]]
-    if (is.null(meta)) {
-        meta <- list(user_burden = NA_character_,
-                     interpretation = NA_character_)
-    }
-    pred_rows[[i]] <- data.frame(
-        method = m,
-        prediction_under_narrowed_factor_levels =
-            if (isTRUE(as.logical(pred_in$success[i]))) "Success" else "Failure",
-        user_burden    = meta$user_burden,
-        interpretation = meta$interpretation,
-        stringsAsFactors = FALSE
+pred_meta_novel <- list(
+    fbrglm = list(
+        user_burden    = "automatic",
+        interpretation = "default glm-strict path: errors on novel levels (like predict.glm)"
+    ),
+    fbrglm_na = list(
+        user_burden    = "user sets on_new_levels = 'na'",
+        interpretation = "opt-in production path: novel-level rows return NA with a warning"
+    ),
+    glmnet_raw_naive = list(
+        user_burden    = "manual matrix alignment required",
+        interpretation = "fails with raw column-width error (not the glm error message)"
+    ),
+    glmnetUtils = list(
+        user_burden    = "automatic",
+        interpretation = "default fast path: fails with raw column-width error"
+    ),
+    glmnetUtils_mf = list(
+        user_burden    = "user must set use.model.frame = TRUE",
+        interpretation = "model.frame path errors with the glm() new-levels message"
+    ),
+    parsnip_workflow = list(
+        user_burden    = "workflow framework",
+        interpretation = "warns, silently substitutes the reference level, returns finite predictions"
+    ),
+    base_glm = list(
+        user_burden    = "reference",
+        interpretation = "stats::glm + predict.glm: errors on novel levels (the gold standard)"
     )
-}
-pred_out <- do.call(rbind, pred_rows)
-rownames(pred_out) <- NULL
+)
 
+build_pred_table <- function(csv_path, meta, result_col_label) {
+    df <- utils::read.csv(csv_path, stringsAsFactors = FALSE)
+    rows <- vector("list", nrow(df))
+    for (i in seq_len(nrow(df))) {
+        m  <- df$method[i]
+        md <- meta[[m]]
+        if (is.null(md)) {
+            md <- list(user_burden = NA_character_,
+                       interpretation = NA_character_)
+        }
+        rows[[i]] <- data.frame(
+            method = m,
+            result = if (isTRUE(as.logical(df$success[i]))) "Success" else "Failure",
+            user_burden    = md$user_burden,
+            interpretation = md$interpretation,
+            stringsAsFactors = FALSE
+        )
+    }
+    out <- do.call(rbind, rows)
+    rownames(out) <- NULL
+    names(out)[2L] <- result_col_label
+    out
+}
+
+pred_out <- build_pred_table(csv_pred, pred_meta_narrowed,
+                              "prediction_under_narrowed_factor_levels")
 pred_csv <- file.path(out_dir, "manuscript_prediction_table.csv")
 save_result_csv(pred_out, pred_csv)
 
 pred_md_path <- file.path(out_dir, "manuscript_prediction_table.md")
 pred_md <- knitr::kable(
-    pred_out,
-    format    = "pipe",
+    pred_out, format = "pipe",
     col.names = c("method",
                   "prediction under narrowed factor levels",
                   "user burden",
@@ -109,9 +153,36 @@ pred_md <- knitr::kable(
     align = c("l", "l", "l", "l")
 )
 writeLines(c("<!-- generated by scripts/30_make_manuscript_tables.R -->",
-             "", as.character(pred_md), ""),
-           pred_md_path)
+             "", as.character(pred_md), ""), pred_md_path)
 message("[30] wrote ", pred_md_path)
+
+if (file.exists(csv_pred_novel)) {
+    pred_novel_out <- build_pred_table(
+        csv_pred_novel, pred_meta_novel,
+        "prediction_under_novel_factor_levels"
+    )
+    pred_novel_csv <- file.path(out_dir,
+                                "manuscript_prediction_table_novel.csv")
+    save_result_csv(pred_novel_out, pred_novel_csv)
+
+    pred_novel_md_path <- file.path(out_dir,
+                                    "manuscript_prediction_table_novel.md")
+    pred_novel_md <- knitr::kable(
+        pred_novel_out, format = "pipe",
+        col.names = c("method",
+                      "prediction under novel test factor levels",
+                      "user burden",
+                      "interpretation"),
+        align = c("l", "l", "l", "l")
+    )
+    writeLines(c("<!-- generated by scripts/30_make_manuscript_tables.R -->",
+                 "", as.character(pred_novel_md), ""), pred_novel_md_path)
+    message("[30] wrote ", pred_novel_md_path)
+} else {
+    message("[30] prediction_failures_novel_small.csv not found; ",
+            "skipping novel-level table.")
+    pred_novel_out <- NULL
+}
 
 ## --- runtime table --------------------------------------------------
 rt_in <- utils::read.csv(csv_rt, stringsAsFactors = FALSE)
@@ -184,8 +255,12 @@ writeLines(c("<!-- generated by scripts/30_make_manuscript_tables.R -->",
            rt_md_path)
 message("[30] wrote ", rt_md_path)
 
-cat("\n=== Prediction table ===\n")
+cat("\n=== Prediction table (narrowed test) ===\n")
 print(pred_out)
+if (!is.null(pred_novel_out)) {
+    cat("\n=== Prediction table (novel-level test) ===\n")
+    print(pred_novel_out)
+}
 cat("\n=== Runtime table ===\n")
 print(rt_out)
 

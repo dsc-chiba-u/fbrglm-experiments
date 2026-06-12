@@ -1,0 +1,8 @@
+"method","success","error_message","pred_length","train_ncol","test_ncol","note"
+"fbrglm",FALSE,"因子 g には新しい水準 C, D があります",NA,3,NA,"default: glm-strict (error on novel levels, auto-align on narrowed)"
+"fbrglm_na",TRUE,NA,50,3,3,"opt-in: novel-level rows -> NA + warning, safe rows score normally"
+"glmnet_raw_naive",FALSE,"The number of variables in newx must be 3",NA,3,5,"manual: model.matrix(train) vs model.matrix(test) separately"
+"glmnetUtils",FALSE,"The number of variables in newx must be 4",NA,4,NA,"default fast path: no xlevels carried; mirrors glmnet raw newx"
+"glmnetUtils_mf",FALSE,"因子 g には新しい水準 C, D があります",NA,3,NA,"glm-equivalent path: xlevels carried via model.frame()"
+"parsnip_workflow",TRUE,NA,50,NA,NA,"workflow: hardhat warns and silently coerces novel-level cells to NA (reference)"
+"base_glm",FALSE,"因子 g には新しい水準 C, D があります",NA,NA,NA,"reference: stats::glm + predict.glm (glm-strict)"

@@ -1,12 +1,25 @@
 ## 10_benchmark_prediction_failures.R
-## Compare how fbrglm / glmnet (naive vs safe) / glmnetUtils handle a
-## factor-level mismatch where test$g has narrower levels than train$g.
 ##
-## Expected outcome:
-##   fbrglm            -> success (xlevels carried on the fit object)
-##   glmnet_raw_naive  -> FAIL    (test model.matrix has fewer columns)
-##   glmnet_raw_safe   -> success (test factor manually relevelled)
-##   glmnetUtils       -> recorded as observed (its own xlevels logic)
+## Compare how fbrglm, raw glmnet, glmnetUtils (two paths), parsnip /
+## workflows, and base::glm() handle the two canonical factor-level
+## scenarios at predict time:
+##
+##   Scenario 1 — narrowed_test:
+##     train$g has levels A/B/C/D; test$g has narrower levels A/B.
+##     The "missing" levels (C, D) just do not occur in test;
+##     model.matrix(~ ... + g, test) is narrower than the train design.
+##
+##   Scenario 2 — novel_level_test:
+##     train$g has levels A/B; test$g has wider levels A/B/C/D.
+##     Test rows carry factor values the trained model never saw.
+##     stats::glm() / predict.glm() would error here — this is the
+##     glm-strict semantics fbrglm follows by default.
+##
+## The script writes two CSV files. Both have the same column layout so
+## downstream tooling can read them with the same parser.
+##
+##   prediction_failures_small.csv        — Scenario 1 (kept for back-compat)
+##   prediction_failures_novel_small.csv  — Scenario 2 (new)
 
 suppressPackageStartupMessages({
     library(fbrglm)
@@ -31,16 +44,8 @@ here_root <- (function() {
          "Run from the repo root, or set FBRGLM_EXP_ROOT.",
          call. = FALSE)
 })()
-source(file.path(here_root, "R", "data_generators.R"), local = TRUE)
+source(file.path(here_root, "R", "data_generators.R"),   local = TRUE)
 source(file.path(here_root, "R", "benchmark_helpers.R"), local = TRUE)
-
-set.seed(110)
-d <- make_factor_mismatch_data(n_train = 200, n_test = 50, seed = 110)
-train <- d$train
-test  <- d$test
-stopifnot(setequal(levels(train$g), c("A", "B", "C", "D")))
-stopifnot(setequal(levels(test$g),  c("A", "B")))
-stopifnot(all(c("A", "B", "C", "D") %in% as.character(train$g)))
 
 lam <- 0.05
 
@@ -48,7 +53,7 @@ row <- function(method, success, err, pred_len, train_ncol, test_ncol, note) {
     data.frame(
         method        = method,
         success       = success,
-        error_message = if (is.na(err) || nzchar(err)) err else NA_character_,
+        error_message = if (is.na(err) || !nzchar(err)) NA_character_ else err,
         pred_length   = pred_len,
         train_ncol    = train_ncol,
         test_ncol     = test_ncol,
@@ -57,191 +62,238 @@ row <- function(method, success, err, pred_len, train_ncol, test_ncol, note) {
     )
 }
 
-results <- list()
+## --- Per-method runners ------------------------------------------------
+## Each runner returns a one-row data.frame via row(). They take a
+## (train, test, mode) triple, where `mode` is one of "narrowed" /
+## "novel" so a runner can swap behaviour when relevant
+## (e.g. fbrglm_na is only sensible under "novel").
 
-## --- fbrglm ----------------------------------------------------------
-fbr_fit <- safe_run(
-    fbrglm(y ~ x1 + x2 + g, data = train, family = "binomial",
-           lambda = "fix", lambda_value = lam)
-)
-fbr_train_ncol <- if (fbr_fit$success) {
-    length(fbr_fit$value$x_colnames)
-} else NA_integer_
-
-if (fbr_fit$success) {
-    fbr_pred <- safe_run(
-        predict(fbr_fit$value, newdata = test, type = "response")
+run_fbrglm <- function(train, test, mode, on_new_levels = "error") {
+    label <- if (on_new_levels == "error") "fbrglm" else "fbrglm_na"
+    fit <- safe_run(
+        suppressMessages(
+            fbrglm(y ~ x1 + x2 + g, data = train, family = "binomial",
+                   lambda = "fix", lambda_value = lam)
+        )
     )
-} else {
-    fbr_pred <- list(success = FALSE, error = "fit failed",
+    train_ncol <- if (fit$success) length(fit$value$x_colnames) else NA_integer_
+    if (fit$success) {
+        pred <- safe_run(suppressWarnings(
+            predict(fit$value, newdata = test, type = "response",
+                    on_new_levels = on_new_levels)
+        ))
+    } else {
+        pred <- list(success = FALSE, error = "fit failed",
                      elapsed = NA_real_, value = NULL)
+    }
+    success <- fit$success && pred$success
+    err <- if (!fit$success) fit$error
+           else if (!pred$success) pred$error
+           else NA_character_
+    note <- if (on_new_levels == "error") {
+        "default: glm-strict (error on novel levels, auto-align on narrowed)"
+    } else {
+        "opt-in: novel-level rows -> NA + warning, safe rows score normally"
+    }
+    row(label, success, err,
+        pred_len   = if (pred$success) length(as.vector(pred$value))
+                     else NA_integer_,
+        train_ncol = train_ncol,
+        test_ncol  = if (pred$success) train_ncol else NA_integer_,
+        note       = note)
 }
-fbr_success <- fbr_fit$success && fbr_pred$success
-fbr_err <- {
-    if (!fbr_fit$success) fbr_fit$error
-    else if (!fbr_pred$success) fbr_pred$error
-    else NA_character_
-}
-results$fbrglm <- row(
-    "fbrglm", fbr_success, fbr_err,
-    pred_len  = if (fbr_pred$success) length(fbr_pred$value) else NA_integer_,
-    train_ncol = fbr_train_ncol,
-    ## fbrglm's predict reshapes test X to train_ncol via xlevels.
-    test_ncol  = if (fbr_pred$success) fbr_train_ncol else NA_integer_,
-    note = "auto: xlevels stored on fit object"
-)
 
-## --- glmnet_raw_naive ------------------------------------------------
-## Build train and test design matrices independently. Predict will see
-## a width mismatch.
-naive_X_tr <- stats::model.matrix(y ~ x1 + x2 + g, data = train)[, -1,
-                                                                 drop = FALSE]
-naive_X_te <- stats::model.matrix(~ x1 + x2 + g, data = test)[, -1,
-                                                              drop = FALSE]
-naive_train_ncol <- ncol(naive_X_tr)
-naive_test_ncol  <- ncol(naive_X_te)
-
-naive_fit <- safe_run(
-    glmnet::glmnet(naive_X_tr, train$y, family = "binomial",
-                   alpha = 1, lambda = lam)
-)
-naive_pred <- if (naive_fit$success) {
-    safe_run(as.vector(predict(naive_fit$value, newx = naive_X_te,
-                               s = lam, type = "response")))
-} else {
-    list(success = FALSE, error = "fit failed",
-         elapsed = NA_real_, value = NULL)
-}
-naive_success <- naive_fit$success && naive_pred$success
-naive_err <- {
-    if (!naive_fit$success) naive_fit$error
-    else if (!naive_pred$success) naive_pred$error
-    else NA_character_
-}
-results$glmnet_raw_naive <- row(
-    "glmnet_raw_naive", naive_success, naive_err,
-    pred_len  = if (naive_pred$success) length(naive_pred$value)
-                else NA_integer_,
-    train_ncol = naive_train_ncol,
-    test_ncol  = naive_test_ncol,
-    note = "manual: model.matrix(train) vs model.matrix(test) separately"
-)
-
-## --- glmnet_raw_safe -------------------------------------------------
-## User manually carries train's levels onto test before model.matrix.
-safe_xlevels <- levels(train$g)
-safe_X_tr <- stats::model.matrix(y ~ x1 + x2 + g, data = train)[, -1,
-                                                                drop = FALSE]
-safe_test <- test
-safe_test$g <- factor(test$g, levels = safe_xlevels)
-safe_X_te <- stats::model.matrix(~ x1 + x2 + g, data = safe_test)[, -1,
+run_glmnet_raw_naive <- function(train, test, mode) {
+    naive_X_tr <- stats::model.matrix(y ~ x1 + x2 + g, data = train)[, -1,
+                                                                     drop = FALSE]
+    naive_X_te <- stats::model.matrix(~ x1 + x2 + g, data = test)[, -1,
                                                                   drop = FALSE]
-safe_train_ncol <- ncol(safe_X_tr)
-safe_test_ncol  <- ncol(safe_X_te)
-
-safe_fit <- safe_run(
-    glmnet::glmnet(safe_X_tr, train$y, family = "binomial",
-                   alpha = 1, lambda = lam)
-)
-safe_pred <- if (safe_fit$success) {
-    safe_run(as.vector(predict(safe_fit$value, newx = safe_X_te,
-                               s = lam, type = "response")))
-} else {
-    list(success = FALSE, error = "fit failed",
-         elapsed = NA_real_, value = NULL)
+    fit <- safe_run(glmnet::glmnet(naive_X_tr, train$y, family = "binomial",
+                                    alpha = 1, lambda = lam))
+    pred <- if (fit$success) {
+        safe_run(as.vector(predict(fit$value, newx = naive_X_te,
+                                    s = lam, type = "response")))
+    } else {
+        list(success = FALSE, error = "fit failed",
+             elapsed = NA_real_, value = NULL)
+    }
+    success <- fit$success && pred$success
+    err <- if (!fit$success) fit$error
+           else if (!pred$success) pred$error
+           else NA_character_
+    row("glmnet_raw_naive", success, err,
+        pred_len   = if (pred$success) length(pred$value) else NA_integer_,
+        train_ncol = ncol(naive_X_tr),
+        test_ncol  = ncol(naive_X_te),
+        note       = "manual: model.matrix(train) vs model.matrix(test) separately")
 }
-safe_success <- safe_fit$success && safe_pred$success
-safe_err <- {
-    if (!safe_fit$success) safe_fit$error
-    else if (!safe_pred$success) safe_pred$error
-    else NA_character_
+
+run_glmnet_raw_safe <- function(train, test, mode) {
+    safe_xlevels <- levels(train$g)
+    safe_X_tr <- stats::model.matrix(y ~ x1 + x2 + g, data = train)[, -1,
+                                                                    drop = FALSE]
+    safe_test <- test
+    safe_test$g <- factor(test$g, levels = safe_xlevels)
+    safe_X_te <- stats::model.matrix(~ x1 + x2 + g, data = safe_test)[, -1,
+                                                                      drop = FALSE]
+    fit <- safe_run(glmnet::glmnet(safe_X_tr, train$y, family = "binomial",
+                                    alpha = 1, lambda = lam))
+    pred <- if (fit$success) {
+        safe_run(as.vector(predict(fit$value, newx = safe_X_te,
+                                    s = lam, type = "response")))
+    } else {
+        list(success = FALSE, error = "fit failed",
+             elapsed = NA_real_, value = NULL)
+    }
+    success <- fit$success && pred$success
+    err <- if (!fit$success) fit$error
+           else if (!pred$success) pred$error
+           else NA_character_
+    row("glmnet_raw_safe", success, err,
+        pred_len   = if (pred$success) length(pred$value) else NA_integer_,
+        train_ncol = ncol(safe_X_tr),
+        test_ncol  = ncol(safe_X_te),
+        note       = "manual: relevel(test$g, levels(train$g)) before model.matrix")
 }
-results$glmnet_raw_safe <- row(
-    "glmnet_raw_safe", safe_success, safe_err,
-    pred_len  = if (safe_pred$success) length(safe_pred$value)
-                else NA_integer_,
-    train_ncol = safe_train_ncol,
-    test_ncol  = safe_test_ncol,
-    note = "manual: relevel(test$g, levels = levels(train$g)) before model.matrix"
-)
 
-## --- glmnetUtils -----------------------------------------------------
-gu_fit <- safe_run(
-    glmnetUtils::glmnet(y ~ x1 + x2 + g, data = train, family = "binomial",
-                        alpha = 1, lambda = lam)
-)
-gu_train_ncol <- if (gu_fit$success) {
-    nrow(coef(gu_fit$value, s = lam)) - 1L   # drop intercept row
-} else NA_integer_
-
-if (gu_fit$success) {
-    gu_pred <- safe_run(
-        as.vector(predict(gu_fit$value, newdata = test, s = lam,
-                          type = "response"))
-    )
-} else {
-    gu_pred <- list(success = FALSE, error = "fit failed",
-                    elapsed = NA_real_, value = NULL)
+run_glmnetUtils <- function(train, test, mode, use_model_frame = FALSE) {
+    label <- if (use_model_frame) "glmnetUtils_mf" else "glmnetUtils"
+    fit_args <- list(formula = y ~ x1 + x2 + g, data = train,
+                     family = "binomial", alpha = 1, lambda = lam)
+    if (use_model_frame) fit_args$use.model.frame <- TRUE
+    fit <- safe_run(do.call(glmnetUtils::glmnet, fit_args))
+    train_ncol <- if (fit$success) {
+        nrow(coef(fit$value, s = lam)) - 1L
+    } else NA_integer_
+    pred <- if (fit$success) {
+        safe_run(as.vector(predict(fit$value, newdata = test, s = lam,
+                                    type = "response")))
+    } else {
+        list(success = FALSE, error = "fit failed",
+             elapsed = NA_real_, value = NULL)
+    }
+    success <- fit$success && pred$success
+    err <- if (!fit$success) fit$error
+           else if (!pred$success) pred$error
+           else NA_character_
+    note <- if (use_model_frame) {
+        "glm-equivalent path: xlevels carried via model.frame()"
+    } else {
+        "default fast path: no xlevels carried; mirrors glmnet raw newx"
+    }
+    row(label, success, err,
+        pred_len   = if (pred$success) length(pred$value) else NA_integer_,
+        train_ncol = train_ncol,
+        test_ncol  = if (pred$success) train_ncol else NA_integer_,
+        note       = note)
 }
-gu_success <- gu_fit$success && gu_pred$success
-gu_err <- {
-    if (!gu_fit$success) gu_fit$error
-    else if (!gu_pred$success) gu_pred$error
-    else NA_character_
-}
-results$glmnetUtils <- row(
-    "glmnetUtils", gu_success, gu_err,
-    pred_len  = if (gu_pred$success) length(gu_pred$value) else NA_integer_,
-    train_ncol = gu_train_ncol,
-    test_ncol  = if (gu_pred$success) gu_train_ncol else NA_integer_,
-    note = "observed: formula interface, but failed under narrowed test factor levels"
-)
 
-## --- parsnip_workflow ------------------------------------------------
-## Classification mode requires a factor outcome.
-train_p <- train
-train_p$y <- factor(train$y)
-
-parsnip_fit <- safe_run({
-    spec <- parsnip::logistic_reg(penalty = lam, mixture = 1) |>
-        parsnip::set_engine("glmnet") |>
-        parsnip::set_mode("classification")
-    wf <- workflows::workflow() |>
-        workflows::add_formula(y ~ x1 + x2 + g) |>
-        workflows::add_model(spec)
-    fit(wf, data = train_p)
-})
-parsnip_pred <- if (parsnip_fit$success) {
-    safe_run({
-        pr <- predict(parsnip_fit$value, new_data = test, type = "prob")
-        as.numeric(pr[[".pred_1"]])
+run_parsnip <- function(train, test, mode) {
+    train_p <- train
+    train_p$y <- factor(train$y)
+    fit <- safe_run({
+        spec <- parsnip::logistic_reg(penalty = lam, mixture = 1) |>
+            parsnip::set_engine("glmnet") |>
+            parsnip::set_mode("classification")
+        wf <- workflows::workflow() |>
+            workflows::add_formula(y ~ x1 + x2 + g) |>
+            workflows::add_model(spec)
+        fit(wf, data = train_p)
     })
-} else {
-    list(success = FALSE, error = "fit failed",
-         elapsed = NA_real_, value = NULL)
+    pred <- if (fit$success) {
+        safe_run(suppressWarnings({
+            pr <- predict(fit$value, new_data = test, type = "prob")
+            as.numeric(pr[[".pred_1"]])
+        }))
+    } else {
+        list(success = FALSE, error = "fit failed",
+             elapsed = NA_real_, value = NULL)
+    }
+    success <- fit$success && pred$success
+    err <- if (!fit$success) fit$error
+           else if (!pred$success) pred$error
+           else NA_character_
+    note <- if (mode == "novel") {
+        "workflow: hardhat warns and silently coerces novel-level cells to NA (reference)"
+    } else {
+        "workflow: hardhat preprocessor carries xlevels"
+    }
+    row("parsnip_workflow", success, err,
+        pred_len   = if (pred$success) length(pred$value) else NA_integer_,
+        train_ncol = NA_integer_,
+        test_ncol  = NA_integer_,
+        note       = note)
 }
-parsnip_success <- parsnip_fit$success && parsnip_pred$success
-parsnip_err <- {
-    if (!parsnip_fit$success) parsnip_fit$error
-    else if (!parsnip_pred$success) parsnip_pred$error
-    else NA_character_
+
+run_base_glm <- function(train, test, mode) {
+    fit <- safe_run(suppressWarnings(
+        stats::glm(y ~ x1 + x2 + g, data = train, family = stats::binomial())
+    ))
+    pred <- if (fit$success) {
+        safe_run(suppressWarnings(
+            as.vector(stats::predict(fit$value, newdata = test, type = "response"))
+        ))
+    } else {
+        list(success = FALSE, error = "fit failed",
+             elapsed = NA_real_, value = NULL)
+    }
+    success <- fit$success && pred$success
+    err <- if (!fit$success) fit$error
+           else if (!pred$success) pred$error
+           else NA_character_
+    row("base_glm", success, err,
+        pred_len   = if (pred$success) length(pred$value) else NA_integer_,
+        train_ncol = NA_integer_,
+        test_ncol  = NA_integer_,
+        note       = "reference: stats::glm + predict.glm (glm-strict)")
 }
-results$parsnip_workflow <- row(
-    "parsnip_workflow", parsnip_success, parsnip_err,
-    pred_len  = if (parsnip_pred$success) length(parsnip_pred$value)
-                else NA_integer_,
-    train_ncol = NA_integer_,
-    test_ncol  = NA_integer_,
-    note = "observed: tidymodels workflow with glmnet engine under narrowed test factor levels"
+
+## --- Scenario 1: narrowed_test (existing behaviour kept) -------------
+set.seed(110)
+d1 <- make_factor_mismatch_data(n_train = 200, n_test = 50, seed = 110)
+stopifnot(setequal(levels(d1$train$g), c("A", "B", "C", "D")))
+stopifnot(setequal(levels(d1$test$g),  c("A", "B")))
+
+s1 <- list(
+    run_fbrglm(d1$train, d1$test, mode = "narrowed", on_new_levels = "error"),
+    run_glmnet_raw_naive(d1$train, d1$test, mode = "narrowed"),
+    run_glmnet_raw_safe (d1$train, d1$test, mode = "narrowed"),
+    run_glmnetUtils     (d1$train, d1$test, mode = "narrowed",
+                          use_model_frame = FALSE),
+    run_glmnetUtils     (d1$train, d1$test, mode = "narrowed",
+                          use_model_frame = TRUE),
+    run_parsnip         (d1$train, d1$test, mode = "narrowed")
 )
+df1 <- do.call(rbind, s1); rownames(df1) <- NULL
+out1 <- file.path(here_root, "results", "summary",
+                  "prediction_failures_small.csv")
+save_result_csv(df1, out1)
+message("[10] narrowed_test scenario:")
+print(df1)
 
-## --- assemble & save -------------------------------------------------
-df <- do.call(rbind, results)
-rownames(df) <- NULL
+## --- Scenario 2: novel_level_test (new) -------------------------------
+set.seed(210)
+d2 <- make_factor_novel_level_data(n_train = 200, n_test = 50, seed = 210)
+stopifnot(setequal(levels(d2$train$g), c("A", "B")))
+stopifnot(setequal(levels(d2$test$g),  c("A", "B", "C", "D")))
+stopifnot(any(as.character(d2$test$g) %in% c("C", "D")))
 
-out_path <- file.path(here_root, "results", "summary",
-                      "prediction_failures_small.csv")
-save_result_csv(df, out_path)
+s2 <- list(
+    run_fbrglm(d2$train, d2$test, mode = "novel", on_new_levels = "error"),
+    run_fbrglm(d2$train, d2$test, mode = "novel", on_new_levels = "na"),
+    run_glmnet_raw_naive(d2$train, d2$test, mode = "novel"),
+    run_glmnetUtils     (d2$train, d2$test, mode = "novel",
+                          use_model_frame = FALSE),
+    run_glmnetUtils     (d2$train, d2$test, mode = "novel",
+                          use_model_frame = TRUE),
+    run_parsnip         (d2$train, d2$test, mode = "novel"),
+    run_base_glm        (d2$train, d2$test, mode = "novel")
+)
+df2 <- do.call(rbind, s2); rownames(df2) <- NULL
+out2 <- file.path(here_root, "results", "summary",
+                  "prediction_failures_novel_small.csv")
+save_result_csv(df2, out2)
+message("[10] novel_level_test scenario:")
+print(df2)
 
-print(df)
 message("[10] prediction_failures: done")

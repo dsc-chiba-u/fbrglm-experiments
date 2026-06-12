@@ -62,6 +62,54 @@ make_factor_mismatch_data <- function(n_train = 200,
     list(train = train, test = test)
 }
 
+#' Generate train/test where the test factor carries unseen levels.
+#'
+#' Mirror image of [make_factor_mismatch_data()]: here the **train** set
+#' uses a narrow level set (A/B) while the **test** set uses a wider one
+#' (A/B/C/D), so test rows can carry factor values the trained model
+#' never observed. This is the "novel-level" failure mode at predict
+#' time — the gold-standard glm() / predict.glm() response is an error
+#' such as "factor g has new levels C, D". The scenario probes how each
+#' wrapper handles this case.
+#'
+#' Every wider level (A/B/C/D) is forced to appear in the test factor at
+#' least once so the comparison is observable regardless of seed.
+#'
+#' @return list with $train and $test data.frames
+make_factor_novel_level_data <- function(n_train = 200,
+                                         n_test = 50,
+                                         seed = 1) {
+    stopifnot(n_train >= 20, n_test >= 10)
+    old <- .Random.seed_safe(seed)
+    on.exit(.Random.seed_restore(old))
+
+    train_levels <- c("A", "B")
+    test_levels  <- c("A", "B", "C", "D")
+
+    g_train_raw <- c(train_levels,
+                     sample(train_levels, n_train - length(train_levels),
+                            replace = TRUE))
+    g_train_raw <- sample(g_train_raw)
+
+    g_test_raw <- c(test_levels,
+                    sample(test_levels, n_test - length(test_levels),
+                           replace = TRUE))
+    g_test_raw <- sample(g_test_raw)
+
+    train <- data.frame(
+        y  = stats::rbinom(n_train, 1, 0.5),
+        x1 = stats::rnorm(n_train),
+        x2 = stats::rnorm(n_train),
+        g  = factor(g_train_raw, levels = train_levels)
+    )
+    test <- data.frame(
+        x1 = stats::rnorm(n_test),
+        x2 = stats::rnorm(n_test),
+        g  = factor(g_test_raw, levels = test_levels)
+    )
+    list(train = train, test = test)
+}
+
 #' Generate a binomial dataset for runtime benchmarking.
 #'
 #' Numeric predictors `x1..x{p_numeric}` plus optionally `n_factor` factor
