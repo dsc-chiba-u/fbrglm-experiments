@@ -1,5 +1,7 @@
 # fbrglm-experiments
 
+[![DOI](https://zenodo.org/badge/1263440115.svg)](https://doi.org/10.5281/zenodo.21016035)
+
 Reproducible experiments and benchmarks for
 [fbrglm](https://github.com/dsc-chiba-u/fbrglm) — a formula-based
 regularized GLM that wraps `glmnet` with a `glm()`-style interface.
