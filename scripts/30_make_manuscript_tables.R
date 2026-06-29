@@ -298,7 +298,7 @@ if (file.exists(csv_fam)) {
         binomial           = "",
         poisson            = "",
         gamma              = "Gamma(link = 'log') family object",
-        negbin_fixed_theta = "fixed theta; MASS::negative.binomial()",
+        negbin_fixed_theta = "fixed theta only",
         cox                = "native glmnet Cox; relative-risk scale",
         multinomial        = "(n x k) matrix output",
         mgaussian          = "(n x q) matrix output"
