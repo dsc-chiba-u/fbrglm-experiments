@@ -1,0 +1,4 @@
+"scenario","n","p","s_true","method","runtime_sec","max_abs_diff_vs_glmnet","n_cols_dropped_by_qr","success"
+"pgtn_n200_p500",200,500,5,"fbrglm_keep",0.0653495619772002,0,NA,TRUE
+"pgtn_n200_p500",200,500,5,"fbrglm_drop",0.0640084580518305,0.347416291024973,301,TRUE
+"pgtn_n200_p500",200,500,5,"glmnet_raw",0.00397111300844699,0,NA,TRUE

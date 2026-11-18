@@ -1,0 +1,16 @@
+"scenario","n","p","s_true","method","iteration","runtime_sec","success","max_abs_diff_vs_glmnet","n_cols_dropped_by_qr","error_message"
+"pgtn_n200_p500",200,500,5,"fbrglm_keep",1,0.0650135369505733,TRUE,0,NA,NA
+"pgtn_n200_p500",200,500,5,"fbrglm_keep",2,0.0673728180117905,TRUE,0,NA,NA
+"pgtn_n200_p500",200,500,5,"fbrglm_keep",3,0.0677785699954256,TRUE,0,NA,NA
+"pgtn_n200_p500",200,500,5,"fbrglm_keep",4,0.0630033579654992,TRUE,0,NA,NA
+"pgtn_n200_p500",200,500,5,"fbrglm_keep",5,0.0653495619772002,TRUE,0,NA,NA
+"pgtn_n200_p500",200,500,5,"fbrglm_drop",1,0.0640084580518305,TRUE,0.347416291024973,301,NA
+"pgtn_n200_p500",200,500,5,"fbrglm_drop",2,0.0674760841066018,TRUE,0.347416291024973,301,NA
+"pgtn_n200_p500",200,500,5,"fbrglm_drop",3,0.0617143680574372,TRUE,0.347416291024973,301,NA
+"pgtn_n200_p500",200,500,5,"fbrglm_drop",4,0.0669144589919597,TRUE,0.347416291024973,301,NA
+"pgtn_n200_p500",200,500,5,"fbrglm_drop",5,0.0623072640737519,TRUE,0.347416291024973,301,NA
+"pgtn_n200_p500",200,500,5,"glmnet_raw",1,0.00699880800675601,TRUE,0,NA,NA
+"pgtn_n200_p500",200,500,5,"glmnet_raw",2,0.00383978604804724,TRUE,0,NA,NA
+"pgtn_n200_p500",200,500,5,"glmnet_raw",3,0.00382591399829835,TRUE,0,NA,NA
+"pgtn_n200_p500",200,500,5,"glmnet_raw",4,0.00397111300844699,TRUE,0,NA,NA
+"pgtn_n200_p500",200,500,5,"glmnet_raw",5,0.00398011703509837,TRUE,0,NA,NA

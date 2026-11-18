@@ -5,7 +5,9 @@
 scripts <- c(
     "scripts/10_benchmark_prediction_failures.R",
     "scripts/11_benchmark_runtime_small.R",
-    "scripts/12_benchmark_families_small.R"
+    "scripts/12_benchmark_families_small.R",
+    "scripts/13_benchmark_rho_sweep.R",
+    "scripts/14_benchmark_pgtn.R"
 )
 
 for (s in scripts) {
